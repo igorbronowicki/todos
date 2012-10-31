@@ -1,3 +1,6 @@
+var ejs = require('ejs');
+    ejs.open = '[%';
+    ejs.close = '%]';
 var express = require('express');
 var app = express();
 
