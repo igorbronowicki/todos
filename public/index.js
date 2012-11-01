@@ -48,26 +48,26 @@ app.Collection.TodoList = Backbone.Collection.extend({
 
     //
     completed: function() {
-        return this.filter(function( todo ) {
+        return this.filter(function(todo) {
             return todo.get('completed');
         });
     },
 
     //
     remaining: function() {
-      return this.without.apply( this, this.completed() );
+      return this.without.apply(this, this.completed());
     },
 
     //
     nextOrder: function() {
-      if ( !this.length ) {
+      if (!this.length) {
         return 1;
       }
       return this.last().get('order') + 1;
     },
 
     // Один дядька говорил избегать этой хуйни.
-    comparator: function( todo ) {
+    comparator: function(todo) {
       return todo.get('order');
     }
 
@@ -106,9 +106,9 @@ app.View.AppView = Backbone.View.extend({
         // Обработчики событий для коллекции {TODO}
         app.Collection.todoList.on('add', this.addOne, this);
         app.Collection.todoList.on('reset', this.addAll, this);
-        app.Collection.todoList.on('all', this.render, this); // Статистика обновляется по каждому чиху
         app.Collection.todoList.on('change:completed', this.filterOne, this); // ??????
         app.Collection.todoList.on('filter', this.filterAll, this); // ?????????
+        app.Collection.todoList.on('all', this.render, this); // Статистика обновляется по каждому чиху
 
         // Заполняем коллекцию данными
         app.Collection.todoList.fetch();
@@ -119,7 +119,7 @@ app.View.AppView = Backbone.View.extend({
         var completed = app.Collection.todoList.completed().length; // Колличество выполненных {TODO}
         var remaining = app.Collection.todoList.remaining().length; // Колличество оставшихся к выполнению {TODO}
 
-        if ( app.Collection.todoList.length ) { // Если коллекция {TODO} не пуста
+        if (app.Collection.todoList.length) { // Если коллекция {TODO} не пуста
             // Отображаем "main" & "footer"
             this.$main.show();
             this.$footer.show();
@@ -227,19 +227,42 @@ app.View.TodoItem = Backbone.View.extend({
 
     // The DOM events specific to an item.
     events: {
+        'click .toggle': 'togglecompleted', // Флажок для {TODO item}
         'dblclick label': 'edit', // Двойной клик по {label} бросает нас в режим редактирования
+        'click .destroy': 'clear', // Клик по крестику (удаление {TODO})
         'keypress .edit': 'updateOnEnter', // Каждый раз когда мы что-то набираем на клавиатуре
         'blur .edit': 'close' // Элемент ввода теряет фокус
     },
 
     initialize: function() {
         this.model.on('change', this.render, this); // Будем слушать события изменения переданного экземпляра модели
+        this.model.on('destroy', this.remove, this);
+        this.model.on('visible', this.toggleVisible, this); // Наше custom событие! :)
     },
 
     render: function() {
         this.$el.html(this.template(this.model.toJSON()));
+        this.$el.toggleClass('completed', this.model.get('completed'));
+
+        this.toggleVisible();
         this.input = this.$('.edit'); // ?????????
         return this;
+    },
+
+    toggleVisible : function () {
+        this.$el.toggleClass('hidden', this.isHidden());
+    },
+
+    isHidden: function() {
+        var isCompleted = this.model.get('completed');
+        return ( // hidden cases only
+            (!isCompleted && app.TodoFilter === 'completed')
+            || (isCompleted && app.TodoFilter === 'active')
+        );
+    },
+
+    togglecompleted: function() {
+        this.model.toggle();
     },
 
     // Переводим этот View в "editing" режим
@@ -253,7 +276,9 @@ app.View.TodoItem = Backbone.View.extend({
         var value = this.input.val().trim(); // Данные из поля
 
         if (value) {
-            this.model.save({title: value }); // Сохраняем данные
+            this.model.save({title: value}); // Сохраняем данные
+        } else {
+            this.clear();
         }
 
         this.$el.removeClass('editing'); // Покидаем режим "editing"
@@ -264,12 +289,44 @@ app.View.TodoItem = Backbone.View.extend({
         if (e.which === ENTER_KEY) {
             this.close();
         }
+    },
+
+    clear: function() {
+        this.model.destroy();
     }
 
 });
 
 
+/**
+ * ????????????
+ * ----------
+ * ??????????
+ */
+
+app.Router.Workspace = Backbone.Router.extend({
+    routes: {
+        '*filter': 'setFilter'
+    },
+
+    setFilter: function(param) {
+        // Сохраняем значение фильтра "completed" или "active"
+        app.TodoFilter = param.trim() || '';
+
+        app.Collection.todoList.trigger('filter');
+    }
+});
+
+app.Router.workspace = new app.Router.Workspace();
+Backbone.history.start();
+
+
+/**
+ * ????????????
+ * ----------
+ * ??????????
+ */
+
 $(function(){
-    console.log("Hello World!");
     new app.View.AppView();
 });
